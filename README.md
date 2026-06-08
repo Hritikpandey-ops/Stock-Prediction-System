@@ -1,173 +1,212 @@
-# Stock Prediction System
+# 📈 Stock Prediction System - Nifty 50 (India)
 
-A cost-effective, scalable stock prediction system for the Indian market (Nifty 50) built with modern ML techniques and open-source tools.
+A cost-effective, scalable stock prediction system for the Indian market using machine learning and free data sources.
 
-## 🚀 Features
+## 🎯 Current Status
 
-- **Multi-source Data Ingestion**: yfinance, Finnhub, Marketaux news API
-- **Advanced Feature Engineering**: 100+ technical indicators, fundamental analysis, sentiment scoring
-- **ML Models**: XGBoost, LSTM, and ensemble methods
-- **Walk-forward Validation**: Robust backtesting with time-series cross-validation
-- **Real-time API**: FastAPI endpoints for predictions and market outlook
-- **Dockerized**: Easy deployment with PostgreSQL + TimescaleDB
+### ✅ Working Features
+- **Database**: PostgreSQL + TimescaleDB (745 price records)
+- **Data Pipeline**: Yahoo Finance → Database
+- **Technical Analysis**: 50+ indicators (SMA, RSI, MACD, Bollinger, etc.)
+- **Frontend Dashboard**: Streamlit app at `http://localhost:8501`
 
-## 📋 Prerequisites
+### 📊 Available Data
+- ^NSEI (Nifty 50 Index): 245 records
+- RELIANCE.NS: 248 records
+- TCS.NS: 248 records
+- Date Range: Jun 2025 - Jun 2026
 
-- Docker & Docker Compose
-- Python 3.10+ (for local development)
-- API keys (optional): Finnhub, Marketaux
+---
 
-## 🛠️ Installation
+## 🚀 Quick Start
 
-### Quick Start (Docker)
-
+### 1. Start Database
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd stock-prediction-system
-
-# Copy environment file
-cp .env.example .env
-
-# Start the stack
-docker-compose up -d
-
-# Access the API
-open http://localhost:8000/docs
-```
-
-### Local Development
-
-```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Set up environment variables
-cp .env.example .env
-# Edit .env with your API keys
-
-# Start PostgreSQL (using Docker only for DB)
 docker-compose up -d db
-
-# Run database migrations
-alembic upgrade head
-
-# Run the API
-uvicorn src.api.main:app --reload
 ```
+
+### 2. Launch Frontend
+```bash
+streamlit run src/frontend/app.py
+```
+
+### 3. Open Browser
+Navigate to: `http://localhost:8501`
+
+**That's it!** You should see the dashboard with price charts and technical indicators.
+
+---
 
 ## 📁 Project Structure
 
 ```
 stock-prediction-system/
-├── config/              # Configuration and settings
+├── config/                 # Configuration
+│   ├── settings.py         # Environment variables
+│   ├── database.py        # SQLAlchemy setup
+│   └── logging_config.py   # Logging
+│
 ├── src/
-│   ├── data_ingestion/  # Data fetchers (yfinance, Finnhub, etc.)
-│   ├── database/        # SQLAlchemy models and repositories
-│   ├── features/        # Technical indicators, sentiment analysis
-│   ├── models/          # ML models (XGBoost, LSTM)
-│   ├── backtesting/     # Strategy backtesting engine
-│   └── api/             # FastAPI endpoints
-├── tests/               # Unit and integration tests
-├── notebooks/           # Jupyter notebooks for exploration
-├── scripts/             # CLI scripts for automation
-└── docker-compose.yml   # Docker orchestration
+│   ├── data_ingestion/     # Data fetching (yfinance, Finnhub)
+│   ├── database/           # ORM models & CRUD
+│   ├── features/           # Technical & sentiment analysis
+│   ├── models/             # ML models (pending)
+│   ├── backtesting/        # Backtesting engine (pending)
+│   ├── api/                # FastAPI endpoints (pending)
+│   └── frontend/           # Streamlit dashboard ✅
+│
+├── scripts/                # CLI tools
+│   ├── fetch_all_data.py  # Data ingestion ✅
+│   ├── init_db.py         # Database setup ✅
+│   └── train_model.py     # ML training (pending)
+│
+├── docker-compose.yml      # Docker setup
+├── requirements.txt        # Python dependencies
+├── QUICKSTART.md          # Quick start guide
+├── PROGRESS_REPORT.md     # Detailed progress
+└── IMPLEMENTATION_PLAN.md # Full roadmap
 ```
-
-## 🎯 Quick Usage
-
-### Fetch Data
-
-```bash
-python scripts/fetch_all_data.py --symbols "RELIANCE.NS,TCS.NS,HDFCBANK.NS"
-```
-
-### Train Model
-
-```bash
-python scripts/train_model.py --symbol "^NSEI" --horizon 1D
-```
-
-### Run Backtest
-
-```bash
-python scripts/run_backtest.py --strategy xgboost --start-date 2023-01-01
-```
-
-### Get Prediction
-
-```bash
-# API endpoint
-curl http://localhost:8000/predict/RELIANCE.NS
-
-# Or via Python
-import requests
-response = requests.get("http://localhost:8000/predict/RELIANCE.NS")
-print(response.json())
-```
-
-## 📊 API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/predict/{symbol}` | GET | Get prediction for a stock |
-| `/nifty/outlook` | GET | Get Nifty 50 market direction |
-| `/backtest/run` | POST | Run backtest for a strategy |
-| `/retrain` | POST | Trigger model retraining |
-| `/health` | GET | Health check |
-| `/docs` | GET | Swagger UI documentation |
-
-## 🔧 Configuration
-
-Copy `.env.example` to `.env` and configure:
-
-```env
-DATABASE_URL=postgresql://stockuser:stockpass@localhost:5432/stock_db
-FINNHUB_API_KEY=your_finnhub_key
-MARKETAUX_API_KEY=your_marketaux_key
-INITIAL_CAPITAL=1000000
-MODEL_VERSION=1.0.0
-```
-
-## 📈 Development Roadmap
-
-- [x] Phase 1: Database & Data Ingestion
-- [x] Phase 2: Feature Engineering
-- [ ] Phase 3: ML Models & Training
-- [ ] Phase 4: Backtesting Engine
-- [ ] Phase 5: API & Deployment
-- [ ] Phase 6: Paper Trading & Alerts
-
-## 🧪 Testing
-
-```bash
-# Run all tests
-pytest tests/ -v
-
-# Run with coverage
-pytest tests/ --cov=src --cov-report=html
-```
-
-## 📝 License
-
-MIT License - See [LICENSE](LICENSE) for details
-
-## ⚠️ Disclaimer
-
-This system is for **educational and research purposes only**. It is not financial advice. Past performance does not guarantee future results. Always do your own research and consult with a licensed financial advisor before making investment decisions.
-
-## 🤝 Contributing
-
-Contributions are welcome! Please read our contributing guidelines before submitting PRs.
-
-## 📞 Support
-
-For issues and questions, please open an issue on GitHub.
 
 ---
 
-Built with ❤️ using Python, FastAPI, XGBoost, and TimescaleDB
+## 🛠️ Tech Stack
+
+| Component | Technology |
+|-----------|------------|
+| Language | Python 3.9+ |
+| Database | PostgreSQL + TimescaleDB |
+| ML | scikit-learn, XGBoost, PyTorch |
+| API | FastAPI + Uvicorn |
+| Frontend | Streamlit + Plotly |
+| Container | Docker + Docker Compose |
+
+---
+
+## 📈 Features
+
+### Data Ingestion ✅
+- Yahoo Finance (free OHLCV data)
+- Finnhub API (fundamentals & news)
+- Marketaux (sentiment analysis - needs API key)
+- Automatic database storage
+
+### Feature Engineering ✅
+- **Technical Indicators**: 50+ (SMA, EMA, RSI, MACD, Bollinger, ATR, etc.)
+- **Fundamental Ratios**: P/E, P/B, ROE, debt/equity
+- **Sentiment Analysis**: VADER for news headlines
+
+### Machine Learning 🚧 (Next Phase)
+- XGBoost classifier for direction prediction
+- LSTM for sequential patterns
+- Walk-forward validation
+- Expected accuracy: 55-70%
+
+### Backtesting 🚧 (Later)
+- Transaction costs (₹20/trade)
+- Slippage modeling
+- Sharpe ratio, max drawdown
+- Risk metrics
+
+---
+
+## 🎯 Usage
+
+### Fetch Stock Data
+```bash
+python scripts/fetch_all_data.py --symbols "^NSEI,RELIANCE.NS" --days 365
+```
+
+### View Dashboard
+```bash
+streamlit run src/frontend/app.py
+```
+
+### Check Database
+```bash
+docker exec stock_prediction_db psql -U stockuser -d stock_db -c "\dt"
+```
+
+---
+
+## 📊 Dashboard Preview
+
+The Streamlit frontend provides:
+
+- **Price Charts**: Interactive candlestick with moving averages
+- **Technical Indicators**: RSI, MACD, Bollinger Bands
+- **Volume Analysis**: Trading volume visualization
+- **Database Status**: Connection health monitoring
+- **Data Summary**: Available symbols and record counts
+
+Access at: `http://localhost:8501`
+
+---
+
+## 🔑 API Keys (Optional)
+
+For full functionality, configure free API keys in `.env`:
+
+```env
+FINNHUB_API_KEY=your_finnhub_key      # https://finnhub.io/
+MARKETAUX_API_KEY=your_marketaux_key  # https://marketaux.com/
+```
+
+---
+
+## 📚 Documentation
+
+- [QUICKSTART.md](QUICKSTART.md) - Get started in 3 steps
+- [PROGRESS_REPORT.md](PROGRESS_REPORT.md) - Detailed progress report
+- [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) - Full implementation plan
+- [src/frontend/README.md](src/frontend/README.md) - Frontend guide
+
+---
+
+## 🎓 Next Steps
+
+1. **Week 1**: Build ML models (XGBoost, LSTM)
+2. **Week 2**: Implement backtesting engine
+3. **Week 3**: Deploy FastAPI + predictions endpoint
+4. **Week 4**: Paper trading simulation
+
+---
+
+## ⚠️ Disclaimer
+
+**This system is for educational and research purposes only.**
+
+- Not financial advice
+- Past performance doesn't guarantee future results
+- Stock investments involve risk
+- Always consult a licensed financial advisor
+
+---
+
+## 🤝 Contributing
+
+Contributions welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Add tests
+4. Submit a pull request
+
+---
+
+## 📞 Support
+
+- Open an issue for bugs
+- Discussions for questions
+- Check PROGRESS_REPORT.md for context
+
+---
+
+## 📄 License
+
+MIT License - See [LICENSE](LICENSE) file
+
+---
+
+**Built with ❤️ using Python, FastAPI, XGBoost, Streamlit, and TimescaleDB**  
+**For the Indian Stock Market (Nifty 50)**  
+**Version**: 1.0.0  
+**Date**: June 8, 2026
