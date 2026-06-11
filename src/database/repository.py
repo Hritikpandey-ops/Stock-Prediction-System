@@ -7,6 +7,19 @@ from sqlalchemy import select, func, and_, or_, desc
 from sqlalchemy.orm import Session
 from decimal import Decimal
 import logging
+import math
+
+
+def _safe_num(value):
+    if value is None:
+        return None
+    try:
+        v = float(value)
+        if math.isnan(v) or math.isinf(v):
+            return None
+        return v
+    except (ValueError, TypeError):
+        return None
 
 from src.database.models import Price, Fundamental, NewsSentiment, ModelPrediction, BacktestResult
 
@@ -168,6 +181,74 @@ class FundamentalRepository(BaseRepository):
         return self.db.query(self.model).filter(
             self.model.symbol == symbol
         ).order_by(desc(self.model.report_date)).first()
+    
+    def fundamentals_to_dict(self, fundamental: Fundamental) -> dict:
+        """Convert Fundamental model to dictionary for dashboard."""
+        if not fundamental:
+            return {}
+        
+        dy = _safe_num(fundamental.dividend_yield)
+        if dy is not None and dy > 1:
+            dy = dy / 100
+        
+        return {
+            'symbol': fundamental.symbol,
+            'company_name': fundamental.company_name,
+            'sector': fundamental.sector,
+            'industry': fundamental.industry,
+            'report_date': fundamental.report_date,
+            'period_type': fundamental.period_type,
+            
+            'current_price': _safe_num(fundamental.current_price),
+            'market_cap': fundamental.market_cap,
+            'fifty_two_week_high': _safe_num(fundamental.fifty_two_week_high),
+            'fifty_two_week_low': _safe_num(fundamental.fifty_two_week_low),
+            'dividend_yield': dy,
+            'shares_outstanding': fundamental.shares_outstanding,
+            
+            'pe_ratio': _safe_num(fundamental.pe_ratio),
+            'pb_ratio': _safe_num(fundamental.pb_ratio),
+            'peg_ratio': _safe_num(fundamental.peg_ratio),
+            'ev_ebitda': _safe_num(fundamental.ev_ebitda),
+            'industry_pe': _safe_num(fundamental.industry_pe),
+            
+            'eps': _safe_num(fundamental.eps),
+            'roe': _safe_num(fundamental.roe),
+            'roce': _safe_num(fundamental.roce),
+            'net_profit_margin': _safe_num(fundamental.net_profit_margin),
+            'operating_margin': _safe_num(fundamental.operating_margin),
+            'ebitda': fundamental.ebitda,
+            
+            'revenue': fundamental.revenue,
+            'revenue_growth_1y': _safe_num(fundamental.revenue_growth_1y),
+            'revenue_growth_3y': _safe_num(fundamental.revenue_growth_3y),
+            'revenue_growth_5y': _safe_num(fundamental.revenue_growth_5y),
+            
+            'net_profit': fundamental.net_profit,
+            'profit_growth_1y': _safe_num(fundamental.profit_growth_1y),
+            'profit_growth_3y': _safe_num(fundamental.profit_growth_3y),
+            'profit_growth_5y': _safe_num(fundamental.profit_growth_5y),
+            
+            'eps_growth_1y': _safe_num(fundamental.eps_growth_1y),
+            'eps_growth_3y': _safe_num(fundamental.eps_growth_3y),
+            'eps_growth_5y': _safe_num(fundamental.eps_growth_5y),
+            
+            'total_debt': fundamental.total_debt,
+            'debt_to_equity': _safe_num(fundamental.debt_to_equity),
+            'interest_coverage': _safe_num(fundamental.interest_coverage),
+            
+            'current_assets': fundamental.current_assets,
+            'current_liabilities': fundamental.current_liabilities,
+            'current_ratio': _safe_num(fundamental.current_ratio),
+            'cash_and_equivalents': fundamental.cash_and_equivalents,
+            'free_cash_flow': fundamental.free_cash_flow,
+            'operating_cash_flow': fundamental.operating_cash_flow,
+            
+            'promoter_holding': _safe_num(fundamental.promoter_holding),
+            'fii_holding': _safe_num(fundamental.fii_holding),
+            'dii_holding': _safe_num(fundamental.dii_holding),
+            'public_holding': _safe_num(fundamental.public_holding),
+        }
 
 
 class NewsSentimentRepository(BaseRepository):

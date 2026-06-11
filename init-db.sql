@@ -23,24 +23,69 @@ CREATE INDEX IF NOT EXISTS idx_prices_timestamp ON prices (timestamp DESC);
 -- Convert to TimescaleDB hypertable (ignore error if already a hypertable)
 SELECT create_hypertable('prices', 'timestamp', if_not_exists := TRUE);
 
--- Create fundamentals table
+-- Create fundamentals table with comprehensive metrics
 CREATE TABLE IF NOT EXISTS fundamentals (
     id BIGSERIAL PRIMARY KEY,
     symbol VARCHAR(10) NOT NULL,
-    report_date DATE NOT NULL,
+    report_date TIMESTAMPTZ NOT NULL,
     period_type VARCHAR(20) NOT NULL,
+    
+    market_cap BIGINT,
+    current_price DECIMAL(12, 2),
+    fifty_two_week_high DECIMAL(12, 2),
+    fifty_two_week_low DECIMAL(12, 2),
+    dividend_yield DECIMAL(5, 2),
+    shares_outstanding BIGINT,
+    
     pe_ratio DECIMAL(10, 2),
     pb_ratio DECIMAL(10, 2),
+    peg_ratio DECIMAL(10, 2),
+    ev_ebitda DECIMAL(10, 2),
+    industry_pe DECIMAL(10, 2),
+    
     eps DECIMAL(10, 2),
     roe DECIMAL(5, 2),
     roce DECIMAL(5, 2),
+    net_profit_margin DECIMAL(5, 2),
+    operating_margin DECIMAL(5, 2),
+    ebitda BIGINT,
+    
+    revenue BIGINT,
+    revenue_growth_1y DECIMAL(5, 2),
+    revenue_growth_3y DECIMAL(5, 2),
+    revenue_growth_5y DECIMAL(5, 2),
+    
+    net_profit BIGINT,
+    profit_growth_1y DECIMAL(5, 2),
+    profit_growth_3y DECIMAL(5, 2),
+    profit_growth_5y DECIMAL(5, 2),
+    
+    eps_growth_1y DECIMAL(5, 2),
+    eps_growth_3y DECIMAL(5, 2),
+    eps_growth_5y DECIMAL(5, 2),
+    
+    total_debt BIGINT,
     debt_to_equity DECIMAL(5, 2),
+    interest_coverage DECIMAL(10, 2),
+    
+    current_assets BIGINT,
+    current_liabilities BIGINT,
     current_ratio DECIMAL(5, 2),
-    profit_margin DECIMAL(5, 2),
-    revenue_growth DECIMAL(5, 2),
-    market_cap BIGINT,
-    shares_outstanding BIGINT,
+    cash_and_equivalents BIGINT,
+    free_cash_flow BIGINT,
+    operating_cash_flow BIGINT,
+    
+    promoter_holding DECIMAL(5, 2),
+    fii_holding DECIMAL(5, 2),
+    dii_holding DECIMAL(5, 2),
+    public_holding DECIMAL(5, 2),
+    
+    sector VARCHAR(100),
+    industry VARCHAR(100),
+    company_name VARCHAR(200),
+    
     created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE (symbol, report_date, period_type)
 );
 

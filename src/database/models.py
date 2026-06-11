@@ -35,7 +35,7 @@ class Price(Base):
 
 
 class Fundamental(Base):
-    """Quarterly and annual fundamental data for stocks."""
+    """Comprehensive fundamental data for stocks - quarterly and annual."""
     
     __tablename__ = "fundamentals"
     
@@ -44,19 +44,62 @@ class Fundamental(Base):
     report_date = Column(DateTime(timezone=True), nullable=False, index=True)
     period_type = Column(String(20), nullable=False)
     
+    market_cap = Column(BigInteger)
+    current_price = Column(Numeric(12, 2))
+    fifty_two_week_high = Column(Numeric(12, 2))
+    fifty_two_week_low = Column(Numeric(12, 2))
+    dividend_yield = Column(Numeric(5, 2))
+    shares_outstanding = Column(BigInteger)
+    
     pe_ratio = Column(Numeric(10, 2))
     pb_ratio = Column(Numeric(10, 2))
+    peg_ratio = Column(Numeric(10, 2))
+    ev_ebitda = Column(Numeric(10, 2))
+    industry_pe = Column(Numeric(10, 2))
+    
     eps = Column(Numeric(10, 2))
     roe = Column(Numeric(5, 2))
     roce = Column(Numeric(5, 2))
+    net_profit_margin = Column(Numeric(5, 2))
+    operating_margin = Column(Numeric(5, 2))
+    ebitda = Column(BigInteger)
+    
+    revenue = Column(BigInteger)
+    revenue_growth_1y = Column(Numeric(5, 2))
+    revenue_growth_3y = Column(Numeric(5, 2))
+    revenue_growth_5y = Column(Numeric(5, 2))
+    
+    net_profit = Column(BigInteger)
+    profit_growth_1y = Column(Numeric(5, 2))
+    profit_growth_3y = Column(Numeric(5, 2))
+    profit_growth_5y = Column(Numeric(5, 2))
+    
+    eps_growth_1y = Column(Numeric(5, 2))
+    eps_growth_3y = Column(Numeric(5, 2))
+    eps_growth_5y = Column(Numeric(5, 2))
+    
+    total_debt = Column(BigInteger)
     debt_to_equity = Column(Numeric(5, 2))
+    interest_coverage = Column(Numeric(10, 2))
+    
+    current_assets = Column(BigInteger)
+    current_liabilities = Column(BigInteger)
     current_ratio = Column(Numeric(5, 2))
-    profit_margin = Column(Numeric(5, 2))
-    revenue_growth = Column(Numeric(5, 2))
-    market_cap = Column(BigInteger)
-    shares_outstanding = Column(BigInteger)
+    cash_and_equivalents = Column(BigInteger)
+    free_cash_flow = Column(BigInteger)
+    operating_cash_flow = Column(BigInteger)
+    
+    promoter_holding = Column(Numeric(5, 2))
+    fii_holding = Column(Numeric(5, 2))
+    dii_holding = Column(Numeric(5, 2))
+    public_holding = Column(Numeric(5, 2))
+    
+    sector = Column(String(100))
+    industry = Column(String(100))
+    company_name = Column(String(200))
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     __table_args__ = (
         UniqueConstraint('symbol', 'report_date', 'period_type', name='uq_symbol_report_period'),

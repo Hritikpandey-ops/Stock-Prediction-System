@@ -1,0 +1,9 @@
+import axios from 'axios';
+
+const api = axios.create({ baseURL: '/api' });
+
+export const getSymbols = () => api.get('/stocks');
+export const getPriceData = (symbol, period = '1Y') => api.get(`/stocks/${symbol}/prices`, { params: { period } });
+export const getFundamentals = (symbol) => api.get(`/stocks/${symbol}/fundamentals`);
+export const getFullData = (symbol, period = '1Y') => api.get(`/stocks/${symbol}/full`, { params: { period } });
+export const getAllFundamentals = () => api.get('/stocks/fundamentals/all');
