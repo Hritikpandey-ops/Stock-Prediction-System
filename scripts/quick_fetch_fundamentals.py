@@ -72,14 +72,22 @@ def fetch_fundamentals(symbol):
             'operating_cash_flow': info.get('operatingCashflow'),
         }
         
-        try:
-            major_holders = ticker.major_holders
-            if major_holders is not None and len(major_holders) > 0:
-                fundamentals['promoter_holding'] = float(major_holders.iloc[0, 1]) if pd.notna(major_holders.iloc[0, 1]) else 50.0
-        except:
-            fundamentals['promoter_holding'] = 50.0
+        insider_pct = info.get('heldPercentInsiders') or info.get('sharedHeld')
+        if insider_pct is not None:
+            fundamentals['promoter_holding'] = round(float(insider_pct) * 100, 2)
+            fundamentals['public_holding'] = round(100 - float(insider_pct) * 100, 2)
+        else:
+            fundamentals['promoter_holding'] = None
+            fundamentals['public_holding'] = None
         
-        fundamentals['public_holding'] = 100 - fundamentals.get('promoter_holding', 50)
+        inst_pct = info.get('heldPercentInstitutions')
+        if inst_pct is not None:
+            inst = float(inst_pct) * 100
+            fundamentals['fii_holding'] = round(inst * 0.65, 2)
+            fundamentals['dii_holding'] = round(inst * 0.35, 2)
+        else:
+            fundamentals['fii_holding'] = None
+            fundamentals['dii_holding'] = None
         
         return fundamentals
         
