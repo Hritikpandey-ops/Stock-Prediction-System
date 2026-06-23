@@ -2,10 +2,12 @@ from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import desc
 import math
 
 from config.database import SessionLocal
-from src.database.repository import PriceRepository, FundamentalRepository
+from src.database.repository import PriceRepository, FundamentalRepository, NewsSentimentRepository
+from src.database.models import NewsSentiment
 from src.analysis.fundamental_scorer import FundamentalScorer
 
 router = APIRouter(prefix="/api/stocks", tags=["stocks"])
@@ -407,4 +409,68 @@ def get_fundamentals(symbol: str, db: Session = Depends(get_db)):
         },
         "bullish_factors": bullish[:10],
         "bearish_factors": bearish[:10],
+    }
+
+
+@router.get("/{symbol}/news")
+def get_stock_news(
+    symbol: str,
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db)
+):
+    """Get latest news articles for a specific stock symbol."""
+    symbol = symbol.upper()
+    if symbol not in SYMBOLS:
+        raise HTTPException(404, "Symbol not found")
+    repo = NewsSentimentRepository(db)
+    # Search for both symbol and clean symbol (without .NS/.BSE)
+    clean_symbol = symbol.replace('.NS', '').replace('.BSE', '')
+    news = repo.get_by_symbol(symbol=clean_symbol, limit=limit)
+    
+    # If no news found for clean symbol, try the original symbol
+    if not news and symbol != clean_symbol:
+        news = repo.get_by_symbol(symbol=symbol, limit=limit)
+    return {
+        "symbol": symbol,
+        "count": len(news),
+        "news": [
+            {
+                "id": n.id,
+                "headline": n.headline,
+                "source": n.source,
+                "published_at": n.published_at.isoformat(),
+                "sentiment_score": float(n.sentiment_score) if n.sentiment_score else None,
+                "sentiment_label": n.sentiment_label,
+                "url": n.url,
+            }
+            for n in news
+        ]
+    }
+
+
+@router.get("/news/latest")
+def get_latest_news(
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db)
+):
+    """Get latest news articles across all Nifty 50 symbols."""
+    repo = NewsSentimentRepository(db)
+    news_items = repo.get_by_symbol(symbol=None, limit=limit)
+    if not news_items:
+        news_items = db.query(NewsSentiment).order_by(desc(NewsSentiment.published_at)).limit(limit).all()
+    return {
+        "count": len(news_items),
+        "news": [
+            {
+                "id": n.id,
+                "symbol": n.symbol,
+                "headline": n.headline,
+                "source": n.source,
+                "published_at": n.published_at.isoformat(),
+                "sentiment_score": float(n.sentiment_score) if n.sentiment_score else None,
+                "sentiment_label": n.sentiment_label,
+                "url": n.url,
+            }
+            for n in news_items
+        ]
     }

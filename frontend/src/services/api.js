@@ -7,3 +7,5 @@ export const getPriceData = (symbol, period = '1Y') => api.get(`/stocks/${symbol
 export const getFundamentals = (symbol) => api.get(`/stocks/${symbol}/fundamentals`);
 export const getFullData = (symbol, period = '1Y') => api.get(`/stocks/${symbol}/full`, { params: { period } });
 export const getAllFundamentals = () => api.get('/stocks/fundamentals/all');
+export const getStockNews = (symbol, limit = 20) => api.get(`/stocks/${symbol}/news`, { params: { limit } });
+export const getLatestNews = (limit = 50) => api.get('/stocks/news/latest', { params: { limit } });

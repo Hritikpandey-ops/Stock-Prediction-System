@@ -124,10 +124,19 @@ class MarketauxFetcher(BaseDataFetcher):
                 else:
                     sentiment_label = None
                 
+                published_at_str = article.get('published_at', '')
+                try:
+                    if published_at_str.endswith('Z'):
+                        published_at = datetime.fromisoformat(published_at_str.replace('Z', '+00:00'))
+                    else:
+                        published_at = datetime.strptime(published_at_str, '%Y-%m-%dT%H:%M:%S.%f')
+                except (ValueError, TypeError):
+                    published_at = datetime.now()
+                
                 news_list.append({
                     'headline': article.get('title', ''),
                     'source': article.get('author', article.get('source', '')),
-                    'published_at': datetime.fromisoformat(article.get('published_at', '').replace('Z', '+00:00')),
+                    'published_at': published_at,
                     'sentiment_score': float(sentiment_score) if sentiment_score is not None else None,
                     'sentiment_label': sentiment_label,
                     'url': article.get('url', ''),

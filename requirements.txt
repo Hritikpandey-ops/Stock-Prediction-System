@@ -6,7 +6,6 @@ alembic==1.13.1
 # Data processing
 pandas==2.1.4
 numpy==1.26.2
-pandas-ta==0.3.14b
 
 # Data ingestion
 yfinance==0.2.36

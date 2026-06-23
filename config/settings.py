@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_format: str = "json"
     
-    # Nifty 50 Constituents (simplified list - can be extended)
+    # Complete Nifty 50 Constituents as of 2024
     nifty50_symbols: List[str] = [
         "^NSEI",  # Nifty 50 Index
         "RELIANCE.NS",
@@ -79,6 +79,39 @@ class Settings(BaseSettings):
         "TITAN.NS",
         "BAJFINANCE.NS",
         "WIPRO.NS",
+        "ONGC.NS",
+        "NTPC.NS",
+        "POWERGRID.NS",
+        "M&M.NS",
+        "ADANIENT.NS",
+        "ADANIPORTS.NS",
+        "JSWSTEEL.NS",
+        "TATASTEEL.NS",
+        "ULTRACEMCO.NS",
+        "COALINDIA.NS",
+        "GRASIM.NS",
+        "HDFCLIFE.NS",
+        "SBILIFE.NS",
+        "BAJAJFINSV.NS",
+        "TATAMOTORS.NS",
+        "DIVISLAB.NS",
+        "BRITANNIA.NS",
+        "HEROMOTOCO.NS",
+        "INDUSINDBK.NS",
+        "NESTLEIND.NS",
+        "TATACONSUM.NS",
+        "DRREDDY.NS",
+        "CIPLA.NS",
+        "APOLLOHOSP.NS",
+        "BPCL.NS",
+        "SHREECEM.NS",
+        "EICHERMOT.NS",
+        "TECHM.NS",
+        "UPL.NS",
+        "HDFC.NS",
+        "BAJAJ-AUTO.NS",
+        "ADANIGREEN.NS",
+        "IOC.NS"
     ]
     
     @field_validator('train_test_split')
@@ -97,7 +130,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
-        case_sensitive = True
+        case_sensitive = False
         extra = "ignore"
 
 

@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { TrendingUp, BarChart3, Search, Star } from 'lucide-react';
+import { TrendingUp, BarChart3, Search, Star, Newspaper } from 'lucide-react';
 
 export default function Navbar() {
   const linkClass = ({ isActive }) =>
@@ -19,6 +19,9 @@ export default function Navbar() {
         </NavLink>
         <NavLink to="/fundamentals" className={linkClass}>
           <Search size={16} /> Fundamentals
+        </NavLink>
+        <NavLink to="/news" className={linkClass}>
+          <Newspaper size={16} /> News
         </NavLink>
         <NavLink to="/screener" className={linkClass}>
           <Search size={16} /> Screener

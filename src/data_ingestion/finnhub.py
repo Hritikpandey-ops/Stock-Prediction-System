@@ -210,10 +210,23 @@ class FinnhubFetcher(BaseDataFetcher):
                 
                 if data:
                     for article in data:
+                        publication_date = article.get('publicationDate')
+                        if isinstance(publication_date, (int, float)):
+                            published_at = datetime.fromtimestamp(publication_date)
+                            if published_at.year == 1970:  # Handle invalid timestamp
+                                published_at = datetime.now()
+                        elif isinstance(publication_date, str):
+                            try:
+                                published_at = datetime.strptime(publication_date, '%Y-%m-%d %H:%M:%S')
+                            except ValueError:
+                                published_at = datetime.now()
+                        else:
+                            published_at = datetime.now()
+                        
                         news_list.append({
                             'headline': article.get('headline', ''),
                             'source': article.get('source', ''),
-                            'published_at': datetime.fromtimestamp(article.get('publicationDate', 0)),
+                            'published_at': published_at,
                             'sentiment_score': None,  # Finnhub doesn't provide sentiment
                             'sentiment_label': None,
                             'url': article.get('url', ''),
@@ -229,10 +242,14 @@ class FinnhubFetcher(BaseDataFetcher):
                 
                 if data:
                     for article in data[:20]:  # Limit to 20 articles
+                        published_at = datetime.fromtimestamp(article.get('publishedAt', 0))
+                        if published_at.year == 1970:  # Handle invalid timestamp
+                            published_at = datetime.now()
+                        
                         news_list.append({
                             'headline': article.get('headline', ''),
                             'source': article.get('source', ''),
-                            'published_at': datetime.fromtimestamp(article.get('publishedAt', 0)),
+                            'published_at': published_at,
                             'sentiment_score': None,
                             'sentiment_label': None,
                             'url': article.get('url', ''),
@@ -241,7 +258,7 @@ class FinnhubFetcher(BaseDataFetcher):
             
             self.logger.info(f"Fetched {len(news_list)} news articles")
             return news_list
-            
+        
         except Exception as e:
             self.logger.error(f"Error fetching news: {str(e)}")
             return []
@@ -275,7 +292,7 @@ class FinnhubFetcher(BaseDataFetcher):
                 }
             
             return None
-            
+        
         except Exception as e:
             self.logger.error(f"Error fetching quote for {symbol}: {str(e)}")
             return None
