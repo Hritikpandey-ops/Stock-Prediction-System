@@ -1,11 +1,12 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { getFullData, getSymbols } from '../services/api';
 import MetricCard from '../components/MetricCard';
+import { SkeletonDashboard } from '../components/SkeletonLoader';
 import {
   ComposedChart, Bar, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  CartesianGrid, Legend, ReferenceLine
+  CartesianGrid, ReferenceLine
 } from 'recharts';
-import { TrendingUp, TrendingDown, Activity, BarChart3, Volume2, DollarSign } from 'lucide-react';
+import { TrendingUp, TrendingDown, BarChart3, DollarSign } from 'lucide-react';
 
 const periods = [
   { label: '1M', days: 30 }, { label: '3M', days: 90 },
@@ -131,7 +132,7 @@ export default function Dashboard() {
       </div>
 
       {loading ? (
-        <div className="text-center py-20 text-slate-400">Loading chart data...</div>
+        <SkeletonDashboard />
       ) : data.length === 0 ? (
         <div className="text-center py-20 text-slate-500">No price data available</div>
       ) : (

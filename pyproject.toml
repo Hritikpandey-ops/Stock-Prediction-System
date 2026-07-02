@@ -1,0 +1,33 @@
+[project]
+name = "stock-prediction-system"
+version = "1.0.0"
+description = "Nifty 50 stock prediction system with technical analysis, fundamentals, and news sentiment"
+requires-python = ">=3.9"
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "UP",   # pyupgrade
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # do not perform function calls in argument defaults
+    "UP007",  # use X | Y for union types (keep Optional for compatibility)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["config", "src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"

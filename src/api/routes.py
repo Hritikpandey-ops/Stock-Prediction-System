@@ -3,14 +3,22 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
-import math
+import pandas as pd
+import ta
 
 from config.database import SessionLocal
+from config.settings import get_settings
 from src.database.repository import PriceRepository, FundamentalRepository, NewsSentimentRepository
 from src.database.models import NewsSentiment
 from src.analysis.fundamental_scorer import FundamentalScorer
 
 router = APIRouter(prefix="/api/stocks", tags=["stocks"])
+
+settings = get_settings()
+SYMBOLS = settings.nifty50_symbols_clean
+
+PERIOD_MAP = {"1M": 30, "3M": 90, "6M": 180, "1Y": 365, "2Y": 730}
+
 
 def get_db():
     db = SessionLocal()
@@ -19,143 +27,96 @@ def get_db():
     finally:
         db.close()
 
-SYMBOLS = [
-    'RELIANCE', 'TCS', 'HDFCBANK', 'ICICIBANK', 'INFY', 'HINDUNILVR', 'ITC', 'SBIN',
-    'BHARTIARTL', 'LT', 'KOTAKBANK', 'HCLTECH', 'AXISBANK', 'ASIANPAINT', 'MARUTI',
-    'SUNPHARMA', 'TITAN', 'BAJFINANCE', 'WIPRO', 'ADANIENT', 'ADANIPORTS', 'APOLLOHOSP',
-    'BAJAJ-AUTO', 'BAJAJFINSV', 'BPCL', 'BRITANNIA', 'CIPLA', 'COALINDIA', 'DIVISLAB',
-    'DRREDDY', 'EICHERMOT', 'GRASIM', 'HDFCLIFE', 'HEROMOTOCO', 'HINDALCO', 'INDUSINDBK',
-    'JSWSTEEL', 'M&M', 'NESTLEIND', 'NTPC', 'ONGC', 'POWERGRID', 'SBILIFE', 'SHRIRAMFIN',
-    'TATACONSUM', 'TATAMOTORS', 'TATASTEEL', 'TECHM', 'TRENT', 'ULTRACEMCO'
-]
 
-PERIOD_MAP = {"1M": 30, "3M": 90, "6M": 180, "1Y": 365, "2Y": 730}
+def compute_indicators(opens, highs, lows, closes, volumes):
+    """Compute all technical indicators using the ta library."""
+    import math
+    n = len(closes)
+    df = pd.DataFrame({
+        'Open': opens, 'High': highs, 'Low': lows,
+        'Close': closes, 'Volume': volumes
+    })
 
+    def _clean(val):
+        """Convert inf/nan to None for JSON serialization."""
+        if val is None:
+            return None
+        try:
+            if math.isinf(val) or math.isnan(val):
+                return None
+            return val
+        except (TypeError, ValueError):
+            return None
 
-def compute_sma(data, period):
-    result = []
-    for i in range(len(data)):
-        if i < period - 1:
-            result.append(None)
-        else:
-            result.append(round(sum(data[i - period + 1:i + 1]) / period, 2))
-    return result
+    indicators = {}
 
+    # SMA — needs at least 'period' data points
+    for period in [20, 50, 200]:
+        col = f'SMA_{period}'
+        df[col] = ta.trend.sma_indicator(df['Close'], window=period) if n >= period else pd.Series([None] * n)
+        indicators[f'sma{period}'] = [_clean(v) for v in df[col].tolist()]
 
-def compute_ema(data, period):
-    k = 2 / (period + 1)
-    result = []
-    ema = data[0] if data else 0
-    for i, val in enumerate(data):
-        if i == 0:
-            ema = val
-        else:
-            ema = val * k + ema * (1 - k)
-        result.append(round(ema, 2))
-    return result
+    # EMA
+    for period in [12, 26, 200]:
+        col = f'EMA_{period}'
+        df[col] = ta.trend.ema_indicator(df['Close'], window=period) if n >= period else pd.Series([None] * n)
+        indicators[f'ema{period}'] = [_clean(v) for v in df[col].tolist()]
 
+    # RSI — needs at least 15 data points
+    df['RSI_14'] = ta.momentum.rsi(df['Close'], window=14) if n >= 15 else pd.Series([None] * n)
+    indicators['rsi'] = [_clean(v) for v in df['RSI_14'].tolist()]
 
-def compute_rsi(data, period=14):
-    if len(data) < period + 1:
-        return [None] * len(data)
-    gains, losses = [], []
-    for i in range(1, len(data)):
-        diff = data[i] - data[i - 1]
-        gains.append(max(diff, 0))
-        losses.append(max(-diff, 0))
-    results = [None] * period
-    avg_gain = sum(gains[:period]) / period
-    avg_loss = sum(losses[:period]) / period
-    for i in range(period, len(gains)):
-        rs = avg_gain / avg_loss if avg_loss != 0 else 100
-        results.append(round(100 - (100 / (1 + rs)), 2))
-        avg_gain = (avg_gain * (period - 1) + gains[i]) / period
-        avg_loss = (avg_loss * (period - 1) + losses[i]) / period
-    return [None] + results
+    # MACD — needs at least 26 data points
+    if n >= 26:
+        macd_obj = ta.trend.MACD(df['Close'])
+        df['MACD'] = macd_obj.macd()
+        df['MACD_Signal'] = macd_obj.macd_signal()
+        df['MACD_Hist'] = macd_obj.macd_diff()
+    else:
+        df['MACD'] = pd.Series([None] * n)
+        df['MACD_Signal'] = pd.Series([None] * n)
+        df['MACD_Hist'] = pd.Series([None] * n)
+    indicators['macd'] = [_clean(v) for v in df['MACD'].tolist()]
+    indicators['macd_signal'] = [_clean(v) for v in df['MACD_Signal'].tolist()]
+    indicators['macd_hist'] = [_clean(v) for v in df['MACD_Hist'].tolist()]
 
+    # Bollinger Bands — needs at least 20 data points
+    if n >= 20:
+        bb_obj = ta.volatility.BollingerBands(df['Close'], window=20, window_dev=2)
+        df['BB_Upper'] = bb_obj.bollinger_hband()
+        df['BB_Middle'] = bb_obj.bollinger_mavg()
+        df['BB_Lower'] = bb_obj.bollinger_lband()
+    else:
+        df['BB_Upper'] = pd.Series([None] * n)
+        df['BB_Middle'] = pd.Series([None] * n)
+        df['BB_Lower'] = pd.Series([None] * n)
+    indicators['bb_upper'] = [_clean(v) for v in df['BB_Upper'].tolist()]
+    indicators['bb_middle'] = [_clean(v) for v in df['BB_Middle'].tolist()]
+    indicators['bb_lower'] = [_clean(v) for v in df['BB_Lower'].tolist()]
 
-def compute_macd(data):
-    ema12 = compute_ema(data, 12)
-    ema26 = compute_ema(data, 26)
-    macd_line = [round(e12 - e26, 2) for e12, e26 in zip(ema12, ema26)]
-    signal = [macd_line[0]]
-    for i in range(1, len(macd_line)):
-        signal.append(round(macd_line[i] * (2 / 10) + signal[-1] * (8 / 10), 2))
-    histogram = [round(m - s, 2) for m, s in zip(macd_line, signal)]
-    return macd_line, signal, histogram
+    # ATR — needs at least 14 data points
+    if n >= 14:
+        df['ATR_14'] = ta.volatility.average_true_range(df['High'], df['Low'], df['Close'], window=14)
+    else:
+        df['ATR_14'] = pd.Series([None] * n)
+    indicators['atr'] = [_clean(v) for v in df['ATR_14'].tolist()]
 
+    # Stochastic — needs at least 14 data points
+    if n >= 14:
+        stoch_obj = ta.momentum.StochasticOscillator(df['High'], df['Low'], df['Close'])
+        df['STOCH_K'] = stoch_obj.stoch()
+        df['STOCH_D'] = stoch_obj.stoch_signal()
+    else:
+        df['STOCH_K'] = pd.Series([None] * n)
+        df['STOCH_D'] = pd.Series([None] * n)
+    indicators['stoch_k'] = [_clean(v) for v in df['STOCH_K'].tolist()]
+    indicators['stoch_d'] = [_clean(v) for v in df['STOCH_D'].tolist()]
 
-def compute_bollinger(data, period=20):
-    upper, middle, lower = [], [], []
-    for i in range(len(data)):
-        if i < period - 1:
-            upper.append(None)
-            middle.append(None)
-            lower.append(None)
-        else:
-            window = data[i - period + 1:i + 1]
-            sma = sum(window) / period
-            variance = sum((x - sma) ** 2 for x in window) / period
-            std = variance ** 0.5
-            middle.append(round(sma, 2))
-            upper.append(round(sma + 2 * std, 2))
-            lower.append(round(sma - 2 * std, 2))
-    return upper, middle, lower
+    # OBV — works with any data length
+    df['OBV'] = ta.volume.on_balance_volume(df['Close'], df['Volume'])
+    indicators['obv'] = [_clean(v) for v in df['OBV'].tolist()]
 
-
-def compute_atr(highs, lows, closes, period=14):
-    if len(highs) < 2:
-        return [None] * len(highs)
-    tr = []
-    for i in range(1, len(highs)):
-        hl = highs[i] - lows[i]
-        hc = abs(highs[i] - closes[i - 1])
-        lc = abs(lows[i] - closes[i - 1])
-        tr.append(max(hl, hc, lc))
-    atr_values = [None]
-    for i in range(len(tr)):
-        if i < period - 1:
-            atr_values.append(None)
-        elif i == period - 1:
-            atr_values.append(round(sum(tr[:period]) / period, 2))
-        else:
-            val = (atr_values[-1] * (period - 1) + tr[i]) / period
-            atr_values.append(round(val, 2))
-    return atr_values
-
-
-def compute_stochastic(highs, lows, closes, k_period=14, d_period=3):
-    k_vals, d_vals = [], []
-    for i in range(len(closes)):
-        if i < k_period - 1:
-            k_vals.append(None)
-            d_vals.append(None)
-        else:
-            hh = max(highs[i - k_period + 1:i + 1])
-            ll = min(lows[i - k_period + 1:i + 1])
-            if hh == ll:
-                k_vals.append(50)
-            else:
-                k_vals.append(round(((closes[i] - ll) / (hh - ll)) * 100, 2))
-    for i in range(len(k_vals)):
-        if k_vals[i] is None or i < d_period - 1:
-            d_vals.append(None)
-        else:
-            valid = [k_vals[j] for j in range(i - d_period + 1, i + 1) if k_vals[j] is not None]
-            d_vals.append(round(sum(valid) / len(valid), 2) if valid else None)
-    return k_vals, d_vals
-
-
-def compute_obv(closes, volumes):
-    obv = [volumes[0]] if volumes else [0]
-    for i in range(1, len(closes)):
-        if closes[i] > closes[i - 1]:
-            obv.append(obv[-1] + volumes[i])
-        elif closes[i] < closes[i - 1]:
-            obv.append(obv[-1] - volumes[i])
-        else:
-            obv.append(obv[-1])
-    return obv
+    return indicators
 
 
 @router.get("")
@@ -175,28 +136,16 @@ def get_full_data(symbol: str, period: str = Query("1Y", regex="^(1M|3M|6M|1Y|2Y
         return {"prices": [], "indicators": {}, "stats": {}}
 
     sorted_p = sorted(prices, key=lambda x: x.timestamp)
-    dates = [p.timestamp.isoformat() for p in sorted_p]
+    # Strip timezone info for JSON serialization
+    dates = [p.timestamp.replace(tzinfo=None).isoformat() for p in sorted_p]
     opens = [float(p.open) for p in sorted_p]
     highs = [float(p.high) for p in sorted_p]
     lows = [float(p.low) for p in sorted_p]
     closes = [float(p.close) for p in sorted_p]
-    volumes = [p.volume or 0 for p in sorted_p]
+    volumes = [int(p.volume or 0) for p in sorted_p]
 
-    sma20 = compute_sma(closes, 20)
-    sma50 = compute_sma(closes, 50)
-    sma200 = compute_sma(closes, min(200, len(closes)))
-    ema12 = compute_ema(closes, 12)
-    ema26 = compute_ema(closes, 26)
-    ema200 = compute_ema(closes, min(200, len(closes)))
-    rsi = compute_rsi(closes)
-    macd_line, macd_signal, macd_hist = compute_macd(closes)
-    bb_upper, bb_middle, bb_lower = compute_bollinger(closes)
-    atr = compute_atr(highs, lows, closes)
-    stoch_k, stoch_d = compute_stochastic(highs, lows, closes)
-    obv = compute_obv(closes, volumes)
+    indicators = compute_indicators(opens, highs, lows, closes, volumes)
 
-    latest = sorted_p[-1]
-    prev = sorted_p[-2] if len(sorted_p) > 1 else None
     change_1d = ((closes[-1] - closes[-2]) / closes[-2] * 100) if len(closes) > 1 else 0
     change_1w = ((closes[-1] - closes[-6]) / closes[-6] * 100) if len(closes) > 6 else 0
     change_1m = ((closes[-1] - closes[-22]) / closes[-22] * 100) if len(closes) > 22 else 0
@@ -207,12 +156,11 @@ def get_full_data(symbol: str, period: str = Query("1Y", regex="^(1M|3M|6M|1Y|2Y
     vol_ratio = round(avg_vol_10 / avg_vol, 2) if avg_vol > 0 else 1
 
     price_changes = []
-    if len(closes) > 1:
-        for i in range(len(closes)):
-            if i == 0:
-                price_changes.append(0)
-            else:
-                price_changes.append(round((closes[i] - closes[i - 1]) / closes[i - 1] * 100, 2))
+    for i in range(len(closes)):
+        if i == 0:
+            price_changes.append(0)
+        else:
+            price_changes.append(round((closes[i] - closes[i - 1]) / closes[i - 1] * 100, 2))
 
     up_days = sum(1 for c in price_changes if c > 0)
     down_days = sum(1 for c in price_changes if c < 0)
@@ -227,24 +175,35 @@ def get_full_data(symbol: str, period: str = Query("1Y", regex="^(1M|3M|6M|1Y|2Y
             "close": closes[i],
             "volume": volumes[i],
             "change": price_changes[i] if i < len(price_changes) else 0,
-            "sma20": sma20[i],
-            "sma50": sma50[i],
-            "sma200": sma200[i],
-            "ema12": ema12[i],
-            "ema26": ema26[i],
-            "ema200": ema200[i],
-            "rsi": rsi[i],
-            "macd": macd_line[i],
-            "macd_signal": macd_signal[i],
-            "macd_hist": macd_hist[i],
-            "bb_upper": bb_upper[i],
-            "bb_middle": bb_middle[i],
-            "bb_lower": bb_lower[i],
-            "atr": atr[i],
-            "stoch_k": stoch_k[i],
-            "stoch_d": stoch_d[i],
-            "obv": obv[i],
+            "sma20": indicators['sma20'][i],
+            "sma50": indicators['sma50'][i],
+            "sma200": indicators['sma200'][i],
+            "ema12": indicators['ema12'][i],
+            "ema26": indicators['ema26'][i],
+            "ema200": indicators['ema200'][i],
+            "rsi": indicators['rsi'][i],
+            "macd": indicators['macd'][i],
+            "macd_signal": indicators['macd_signal'][i],
+            "macd_hist": indicators['macd_hist'][i],
+            "bb_upper": indicators['bb_upper'][i],
+            "bb_middle": indicators['bb_middle'][i],
+            "bb_lower": indicators['bb_lower'][i],
+            "atr": indicators['atr'][i],
+            "stoch_k": indicators['stoch_k'][i],
+            "stoch_d": indicators['stoch_d'][i],
+            "obv": indicators['obv'][i],
         })
+
+    def _safe(v):
+        import math
+        if v is None:
+            return None
+        try:
+            if math.isinf(v) or math.isnan(v):
+                return None
+            return round(v, 2)
+        except (TypeError, ValueError):
+            return None
 
     stats = {
         "current_price": closes[-1] if closes else 0,
@@ -266,20 +225,20 @@ def get_full_data(symbol: str, period: str = Query("1Y", regex="^(1M|3M|6M|1Y|2Y
         "up_days": up_days,
         "down_days": down_days,
         "total_days": len(closes),
-        "rsi": rsi[-1] if rsi else None,
-        "macd": macd_line[-1] if macd_line else None,
-        "macd_signal": macd_signal[-1] if macd_signal else None,
-        "macd_hist": macd_hist[-1] if macd_hist else None,
-        "atr": atr[-1] if atr else None,
-        "stoch_k": stoch_k[-1] if stoch_k else None,
-        "stoch_d": stoch_d[-1] if stoch_d else None,
-        "bb_upper": bb_upper[-1] if bb_upper else None,
-        "bb_middle": bb_middle[-1] if bb_middle else None,
-        "bb_lower": bb_lower[-1] if bb_lower else None,
-        "sma20": sma20[-1] if sma20 else None,
-        "sma50": sma50[-1] if sma50 else None,
-        "sma200": sma200[-1] if sma200 else None,
-        "ema200": ema200[-1] if ema200 else None,
+        "rsi": _safe(indicators['rsi'][-1]),
+        "macd": _safe(indicators['macd'][-1]),
+        "macd_signal": _safe(indicators['macd_signal'][-1]),
+        "macd_hist": _safe(indicators['macd_hist'][-1]),
+        "atr": _safe(indicators['atr'][-1]),
+        "stoch_k": _safe(indicators['stoch_k'][-1]),
+        "stoch_d": _safe(indicators['stoch_d'][-1]),
+        "bb_upper": _safe(indicators['bb_upper'][-1]),
+        "bb_middle": _safe(indicators['bb_middle'][-1]),
+        "bb_lower": _safe(indicators['bb_lower'][-1]),
+        "sma20": _safe(indicators['sma20'][-1]),
+        "sma50": _safe(indicators['sma50'][-1]),
+        "sma200": _safe(indicators['sma200'][-1]),
+        "ema200": _safe(indicators['ema200'][-1]),
     }
 
     return {
@@ -301,12 +260,12 @@ def get_prices(symbol: str, period: str = Query("1Y", regex="^(1M|3M|6M|1Y|2Y)$"
     return {
         "prices": [
             {
-                "date": p.timestamp.isoformat(),
+                "date": p.timestamp.replace(tzinfo=None).isoformat(),
                 "open": float(p.open),
                 "high": float(p.high),
                 "low": float(p.low),
                 "close": float(p.close),
-                "volume": p.volume or 0,
+                "volume": int(p.volume or 0),
             }
             for p in sorted(prices, key=lambda x: x.timestamp)
         ]
@@ -325,36 +284,10 @@ def get_indicators(symbol: str, period: str = Query("1Y", regex="^(1M|3M|6M|1Y|2
     closes = [float(p.close) for p in sorted_p]
     highs = [float(p.high) for p in sorted_p]
     lows = [float(p.low) for p in sorted_p]
-    volumes = [p.volume or 0 for p in sorted_p]
+    opens = [float(p.open) for p in sorted_p]
+    volumes = [int(p.volume or 0) for p in sorted_p]
 
-    rsi = compute_rsi(closes)
-    macd_line, macd_signal, macd_hist = compute_macd(closes)
-    bb_upper, bb_middle, bb_lower = compute_bollinger(closes)
-    sma20 = compute_sma(closes, 20)
-    sma50 = compute_sma(closes, 50)
-    ema12 = compute_ema(closes, 12)
-    ema26 = compute_ema(closes, 26)
-    atr = compute_atr(highs, lows, closes)
-    stoch_k, stoch_d = compute_stochastic(highs, lows, closes)
-    obv = compute_obv(closes, volumes)
-
-    return {
-        "rsi": rsi,
-        "macd": macd_line,
-        "macd_signal": macd_signal,
-        "macd_histogram": macd_hist,
-        "bb_upper": bb_upper,
-        "bb_middle": bb_middle,
-        "bb_lower": bb_lower,
-        "sma20": sma20,
-        "sma50": sma50,
-        "ema12": ema12,
-        "ema26": ema26,
-        "atr": atr,
-        "stoch_k": stoch_k,
-        "stoch_d": stoch_d,
-        "obv": obv,
-    }
+    return compute_indicators(opens, highs, lows, closes, volumes)
 
 
 @router.get("/fundamentals/all")
@@ -423,11 +356,9 @@ def get_stock_news(
     if symbol not in SYMBOLS:
         raise HTTPException(404, "Symbol not found")
     repo = NewsSentimentRepository(db)
-    # Search for both symbol and clean symbol (without .NS/.BSE)
     clean_symbol = symbol.replace('.NS', '').replace('.BSE', '')
     news = repo.get_by_symbol(symbol=clean_symbol, limit=limit)
-    
-    # If no news found for clean symbol, try the original symbol
+
     if not news and symbol != clean_symbol:
         news = repo.get_by_symbol(symbol=symbol, limit=limit)
     return {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getAllFundamentals } from '../services/api';
-import { Search, TrendingUp, TrendingDown } from 'lucide-react';
+import { SkeletonTable } from '../components/SkeletonLoader';
+import { Search } from 'lucide-react';
 
 function getScoreColor(score) {
   if (score >= 80) return 'text-green-400';
@@ -74,7 +75,7 @@ export default function Screener() {
       </div>
 
       {loading ? (
-        <div className="text-center py-20 text-slate-400">Loading stocks...</div>
+        <SkeletonTable rows={10} cols={8} />
       ) : (
         <div className="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden">
           <div className="overflow-x-auto">

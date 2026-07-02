@@ -63,7 +63,6 @@ export default function CandlestickChart({ data, showSMA = true }) {
   if (!data || data.length === 0) return <p className="text-slate-400 text-center py-10">No data available</p>;
 
   const weekly = aggregateWeekly(data);
-  const closePrices = weekly.map(d => d.close);
   const sma20 = calculateSMA(weekly, Math.min(20, weekly.length));
   const sma50 = calculateSMA(weekly, Math.min(50, weekly.length));
   const ema12 = calculateEMA(weekly, Math.min(12, weekly.length));

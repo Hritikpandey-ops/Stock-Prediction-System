@@ -114,6 +114,11 @@ class Settings(BaseSettings):
         "IOC.NS"
     ]
     
+    @property
+    def nifty50_symbols_clean(self) -> List[str]:
+        """Return Nifty 50 symbols without .NS/.BSE suffixes for API use."""
+        return [s.replace('.NS', '').replace('.BSE', '') for s in self.nifty50_symbols if s != '^NSEI']
+    
     @field_validator('train_test_split')
     @classmethod
     def validate_split(cls, v: float) -> float:

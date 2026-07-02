@@ -54,6 +54,10 @@ class YahooFinanceFetcher(BaseDataFetcher):
             # Reset index to get timestamp as column
             df = df.reset_index()
             
+            # Convert timezone-aware timestamps to naive (UTC)
+            if hasattr(df['Date'].dtype, 'tz') and df['Date'].dt.tz is not None:
+                df['Date'] = df['Date'].dt.tz_localize(None)
+            
             # Convert to list of dictionaries
             records = []
             for _, row in df.iterrows():

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getLatestNews, getStockNews, getSymbols } from '../services/api';
+import { SkeletonNews } from '../components/SkeletonLoader';
 import { Newspaper, ExternalLink, Filter } from 'lucide-react';
 
 const SENTIMENT_COLORS = {
@@ -28,12 +29,6 @@ function formatDate(dateStr) {
   hours = hours ? hours : 12; // Convert 0 to 12
   
   return `${day} ${month} ${year}, ${hours}:${minutes} ${ampm}`;
-}
-
-function sentimentColor(label) {
-  if (label === 'POSITIVE') return 'text-green-400';
-  if (label === 'NEGATIVE') return 'text-red-400';
-  return 'text-yellow-400';
 }
 
 function SentimentBadge({ label, score }) {
@@ -166,7 +161,7 @@ export default function News() {
       )}
 
       {loading ? (
-        <div className="text-center py-20 text-slate-400">Loading news...</div>
+        <SkeletonNews />
       ) : news.length === 0 ? (
         <div className="text-center py-20 text-slate-500">
           No news found.

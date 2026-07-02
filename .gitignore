@@ -35,6 +35,13 @@ env/
 # Environment variables
 .env
 .env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+*.log.zip
+nohup.out
 
 # Database
 *.db

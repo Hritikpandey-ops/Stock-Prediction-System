@@ -1,8 +1,8 @@
 """
-Technical indicator calculations using pandas_ta.
+Technical indicator calculations using the ta library.
 """
 import pandas as pd
-import pandas_ta as ta
+import ta
 from typing import Dict, Any, List, Optional
 from loguru import logger
 
@@ -19,21 +19,12 @@ class TechnicalFeatureEngineer:
         Calculate all technical indicators for a DataFrame.
         
         Args:
-            df: DataFrame with OHLCV data (must have columns: Open, High, Low, Close, Volume)
+            df: DataFrame with OHLCV data (must have columns: open, high, low, close, volume)
             
         Returns:
             DataFrame with added technical indicators
         """
         df = df.copy()
-        
-        # Ensure proper column names for pandas_ta
-        df.rename(columns={
-            'open': 'Open',
-            'high': 'High',
-            'low': 'Low',
-            'close': 'Close',
-            'volume': 'Volume'
-        }, inplace=True, errors='ignore')
         
         try:
             # Calculate trend indicators
@@ -51,7 +42,7 @@ class TechnicalFeatureEngineer:
             # Calculate support/resistance levels
             df = self._add_support_resistance(df)
             
-            self.logger.info(f"Calculated {len([c for c in df.columns if c not in ['Open', 'High', 'Low', 'Close', 'Volume']])} technical indicators")
+            self.logger.info(f"Calculated {len([c for c in df.columns if c not in ['open', 'high', 'low', 'close', 'volume']])} technical indicators")
             
         except Exception as e:
             self.logger.error(f"Error calculating technical indicators: {str(e)}")
@@ -63,35 +54,24 @@ class TechnicalFeatureEngineer:
         
         # Moving Averages
         for period in [5, 10, 20, 50, 100, 200]:
-            df[f'SMA_{period}'] = ta.sma(df['Close'], length=period)
-            df[f'EMA_{period}'] = ta.ema(df['Close'], length=period)
+            df[f'SMA_{period}'] = ta.trend.sma_indicator(df['close'], window=period)
+            df[f'EMA_{period}'] = ta.trend.ema_indicator(df['close'], window=period)
         
         # MACD
-        macd = ta.macd(df['Close'])
-        if macd is not None:
-            df['MACD'] = macd['MACD_12_26_9']
-            df['MACD_Signal'] = macd['MACDs_12_26_9']
-            df['MACD_Hist'] = macd['MACDh_12_26_9']
+        macd_obj = ta.trend.MACD(df['close'])
+        df['MACD'] = macd_obj.macd()
+        df['MACD_Signal'] = macd_obj.macd_signal()
+        df['MACD_Hist'] = macd_obj.macd_diff()
         
         # ADX (Trend Strength)
-        adx = ta.adx(df['High'], df['Low'], df['Close'])
-        if adx is not None:
-            df['ADX'] = adx['ADX_14']
-            df['DI_Plus'] = adx['DMP_14']
-            df['DI_Minus'] = adx['DMN_14']
+        adx_obj = ta.trend.ADXIndicator(df['high'], df['low'], df['close'])
+        df['ADX'] = adx_obj.adx()
+        df['DI_Plus'] = adx_obj.adx_pos()
+        df['DI_Minus'] = adx_obj.adx_neg()
         
         # Parabolic SAR
-        psar = ta.psar(df['High'], df['Low'], df['Close'])
-        if psar is not None:
-            df['PSAR'] = psar['PSARl_0.02_0.2']
-        
-        # Ichimoku Cloud
-        ichimoku = ta.ichimoku(df['High'], df['Low'], df['Close'])
-        if ichimoku is not None:
-            df['Ichimoku_Conversion'] = ichimoku['IKC_9']
-            df['Ichimoku_Base'] = ichimoku['IKS_26']
-            df['Ichimoku_A'] = ichimoku['IKS_52']
-            df['Ichimoku_B'] = ichimoku['IKD_9']
+        psar_obj = ta.trend.PSARIndicator(df['high'], df['low'], df['close'])
+        df['PSAR'] = psar_obj.psar()
         
         return df
     
@@ -99,30 +79,27 @@ class TechnicalFeatureEngineer:
         """Add momentum indicators."""
         
         # RSI
-        df['RSI_14'] = ta.rsi(df['Close'], length=14)
-        df['RSI_7'] = ta.rsi(df['Close'], length=7)
-        df['RSI_21'] = ta.rsi(df['Close'], length=21)
+        df['RSI_14'] = ta.momentum.rsi(df['close'], window=14)
+        df['RSI_7'] = ta.momentum.rsi(df['close'], window=7)
+        df['RSI_21'] = ta.momentum.rsi(df['close'], window=21)
         
         # Stochastic Oscillator
-        stoch = ta.stoch(df['High'], df['Low'], df['Close'])
-        if stoch is not None:
-            df['STOCH_K'] = stoch['STOCHK_14_3_3']
-            df['STOCH_D'] = stoch['STOCHD_14_3_3']
+        stoch_obj = ta.momentum.StochasticOscillator(df['high'], df['low'], df['close'])
+        df['STOCH_K'] = stoch_obj.stoch()
+        df['STOCH_D'] = stoch_obj.stoch_signal()
         
         # Williams %R
-        willr = ta.willr(df['High'], df['Low'], df['Close'])
-        if willr is not None:
-            df['WILLR'] = willr['WILLR_14']
+        df['WILLR'] = ta.momentum.williams_r(df['high'], df['low'], df['close'])
         
         # CCI (Commodity Channel Index)
-        df['CCI_20'] = ta.cci(df['High'], df['Low'], df['Close'], length=20)
+        df['CCI_20'] = ta.trend.cci(df['high'], df['low'], df['close'], window=20)
         
         # ROC (Rate of Change)
-        df['ROC_10'] = ta.roc(df['Close'], length=10)
-        df['ROC_20'] = ta.roc(df['Close'], length=20)
+        df['ROC_10'] = ta.momentum.roc(df['close'], window=10)
+        df['ROC_20'] = ta.momentum.roc(df['close'], window=20)
         
         # Momentum
-        df['MOM_10'] = ta.mom(df['Close'], length=10)
+        df['MOM_10'] = ta.momentum.roc(df['close'], window=10)
         
         return df
     
@@ -130,31 +107,22 @@ class TechnicalFeatureEngineer:
         """Add volatility indicators."""
         
         # Bollinger Bands
-        bbands = ta.bbands(df['Close'])
-        if bbands is not None:
-            df['BB_Upper'] = bbands['BBU_5_2.0']
-            df['BB_Middle'] = bbands['BBM_5_2.0']
-            df['BB_Lower'] = bbands['BBL_5_2.0']
-            df['BB_Width'] = bbands['BBW_5_2.0']
-            df['BB_Pct'] = bbands['BBP_5_2.0']
+        bb_obj = ta.volatility.BollingerBands(df['close'], window=20, window_dev=2)
+        df['BB_Upper'] = bb_obj.bollinger_hband()
+        df['BB_Middle'] = bb_obj.bollinger_mavg()
+        df['BB_Lower'] = bb_obj.bollinger_lband()
+        df['BB_Width'] = bb_obj.bollinger_wband()
+        df['BB_Pct'] = bb_obj.bollinger_pband()
         
         # ATR (Average True Range)
-        df['ATR_14'] = ta.atr(df['High'], df['Low'], df['Close'], length=14)
-        df['ATR_7'] = ta.atr(df['High'], df['Low'], df['Close'], length=7)
-        
-        # Standard Deviation
-        df['StdDev_20'] = ta.stdev(df['Close'], length=20)
-        
-        # Historical Volatility
-        df['HV_10'] = ta.cvi(df['Close'], length=10)
-        df['HV_20'] = ta.cvi(df['Close'], length=20)
+        df['ATR_14'] = ta.volatility.average_true_range(df['high'], df['low'], df['close'], window=14)
+        df['ATR_7'] = ta.volatility.average_true_range(df['high'], df['low'], df['close'], window=7)
         
         # Keltner Channels
-        kc = ta.kc(df['High'], df['Low'], df['Close'])
-        if kc is not None:
-            df['KC_Upper'] = kc['KCU_20_10_2.0']
-            df['KC_Middle'] = kc['KCM_20_10_2.0']
-            df['KC_Lower'] = kc['KCL_20_10_2.0']
+        kc_obj = ta.volatility.KeltnerChannel(df['high'], df['low'], df['close'])
+        df['KC_Upper'] = kc_obj.keltner_channel_hband()
+        df['KC_Middle'] = kc_obj.keltner_channel_mband()
+        df['KC_Lower'] = kc_obj.keltner_channel_lband()
         
         return df
     
@@ -162,34 +130,23 @@ class TechnicalFeatureEngineer:
         """Add volume-based indicators."""
         
         # Volume Moving Average
-        df['Volume_SMA_10'] = ta.sma(df['Volume'], length=10)
-        df['Volume_SMA_20'] = ta.sma(df['Volume'], length=20)
+        df['Volume_SMA_10'] = ta.trend.sma_indicator(df['volume'], window=10)
+        df['Volume_SMA_20'] = ta.trend.sma_indicator(df['volume'], window=20)
         
         # OBV (On-Balance Volume)
-        df['OBV'] = ta.obv(df['Close'], df['Volume'])
-        
-        # Volume Price Trend
-        vpt = ta.vpt(df['Close'], df['Volume'])
-        if vpt is not None:
-            df['VPT'] = vpt['VPT']
+        df['OBV'] = ta.volume.on_balance_volume(df['close'], df['volume'])
         
         # Money Flow Index
-        mfi = ta.mfi(df['High'], df['Low'], df['Close'], df['Volume'])
-        if mfi is not None:
-            df['MFI_14'] = mfi['MFI_14']
+        df['MFI_14'] = ta.volume.money_flow_index(df['high'], df['low'], df['close'], df['volume'])
         
         # Accumulation/Distribution
-        ad = ta.ad(df['High'], df['Low'], df['Close'], df['Volume'])
-        if ad is not None:
-            df['AD'] = ad['AD']
+        df['AD'] = ta.volume.acc_dist_index(df['high'], df['low'], df['close'], df['volume'])
         
         # Chaikin Money Flow
-        cmf = ta.cmf(df['High'], df['Low'], df['Close'], df['Volume'])
-        if cmf is not None:
-            df['CMF_20'] = cmf['CMF_20']
+        df['CMF_20'] = ta.volume.chaikin_money_flow(df['high'], df['low'], df['close'], df['volume'])
         
         # Volume Ratio
-        df['Volume_Ratio'] = df['Volume'] / df['Volume_SMA_10']
+        df['Volume_Ratio'] = df['Volume_SMA_10'].apply(lambda x: df['volume'] / x if x and x > 0 else 0)
         
         return df
     
@@ -197,9 +154,9 @@ class TechnicalFeatureEngineer:
         """Add support and resistance levels."""
         
         # Pivot Points
-        high = df['High'].rolling(window=5).max()
-        low = df['Low'].rolling(window=5).min()
-        close = df['Close'].rolling(window=5).mean()
+        high = df['high'].rolling(window=5).max()
+        low = df['low'].rolling(window=5).min()
+        close = df['close'].rolling(window=5).mean()
         
         # Classic Pivot Points
         pivot = (high + low + close) / 3
@@ -210,9 +167,9 @@ class TechnicalFeatureEngineer:
         df['Support_2'] = pivot - (high - low)
         
         # Price position relative to moving averages
-        df['Price_vs_SMA20'] = (df['Close'] - df['SMA_20']) / df['SMA_20'] * 100
-        df['Price_vs_SMA50'] = (df['Close'] - df['SMA_50']) / df['SMA_50'] * 100
-        df['Price_vs_SMA200'] = (df['Close'] - df['SMA_200']) / df['SMA_200'] * 100
+        df['Price_vs_SMA20'] = (df['close'] - df['SMA_20']) / df['SMA_20'] * 100
+        df['Price_vs_SMA50'] = (df['close'] - df['SMA_50']) / df['SMA_50'] * 100
+        df['Price_vs_SMA200'] = (df['close'] - df['SMA_200']) / df['SMA_200'] * 100
         
         # Golden Cross / Death Cross
         df['MA_Cross_50_200'] = (df['SMA_50'] > df['SMA_200']).astype(int)
@@ -242,13 +199,13 @@ class TechnicalFeatureEngineer:
         if direction_only:
             # Binary classification: 1 if price goes up, 0 if down
             df[f'Target_Dir_{horizon}D'] = (
-                df['Close'].shift(-horizon) > df['Close']
+                df['close'].shift(-horizon) > df['close']
             ).astype(int)
         else:
             # Regression: actual return
             df[f'Target_Return_{horizon}D'] = (
-                df['Close'].shift(-horizon) - df['Close']
-            ) / df['Close'] * 100
+                df['close'].shift(-horizon) - df['close']
+            ) / df['close'] * 100
         
         return df
     
@@ -261,7 +218,6 @@ class TechnicalFeatureEngineer:
             'MACD', 'MACD_Signal', 'MACD_Hist',
             'ADX', 'DI_Plus', 'DI_Minus',
             'PSAR',
-            'Ichimoku_Conversion', 'Ichimoku_Base', 'Ichimoku_A', 'Ichimoku_B',
             
             # Momentum indicators
             'RSI_7', 'RSI_14', 'RSI_21',
@@ -274,13 +230,11 @@ class TechnicalFeatureEngineer:
             # Volatility indicators
             'BB_Upper', 'BB_Middle', 'BB_Lower', 'BB_Width', 'BB_Pct',
             'ATR_7', 'ATR_14',
-            'StdDev_20',
-            'HV_10', 'HV_20',
             'KC_Upper', 'KC_Middle', 'KC_Lower',
             
             # Volume indicators
             'Volume_SMA_10', 'Volume_SMA_20',
-            'OBV', 'VPT', 'MFI_14', 'AD', 'CMF_20', 'Volume_Ratio',
+            'OBV', 'MFI_14', 'AD', 'CMF_20', 'Volume_Ratio',
             
             # Support/Resistance
             'Pivot_Point', 'Resistance_1', 'Support_1', 'Resistance_2', 'Support_2',

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getFundamentals, getSymbols } from '../services/api';
 import FundamentalGauge from '../components/FundamentalGauge';
 import RadarScore from '../components/RadarScore';
+import { SkeletonFundamentals } from '../components/SkeletonLoader';
 import { TrendingUp, TrendingDown, Building2, DollarSign, Activity, PieChart, Shield, BarChart3 } from 'lucide-react';
 
 function formatCurrency(v) {
@@ -44,18 +45,6 @@ function colored(value, opts = {}) {
   if (value == null) return 'text-slate-500';
   if (opts.invert) return value <= (opts.threshold ?? 0) ? 'text-green-400' : 'text-red-400';
   return value >= (opts.threshold ?? 0) ? 'text-green-400' : 'text-red-400';
-}
-
-function StatRow({ label, value, color, hint }) {
-  return (
-    <div className="flex justify-between items-center py-1.5 border-b border-slate-700/50 last:border-0">
-      <div>
-        <span className="text-xs text-slate-400">{label}</span>
-        {hint && <span className="text-[10px] text-slate-600 ml-1">({hint})</span>}
-      </div>
-      <span className={`text-xs font-medium ${color || 'text-white'}`}>{value ?? 'N/A'}</span>
-    </div>
-  );
 }
 
 function Section({ title, icon: Icon, children, color = 'blue' }) {
@@ -130,7 +119,7 @@ export default function Fundamentals() {
       </div>
 
       {loading ? (
-        <div className="text-center py-20 text-slate-400">Loading fundamentals...</div>
+        <SkeletonFundamentals />
       ) : !data ? (
         <div className="text-center py-20 text-slate-500">No fundamental data available.<br/>Run <code className="text-blue-400">python scripts/fetch_fundamentals.py</code> first.</div>
       ) : (
